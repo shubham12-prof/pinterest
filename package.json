@@ -3,11 +3,11 @@
   "homepage": "https://shubham12-prof.github.io/pinterest",
   "version": "0.0.0",
   "private": true,
-    "scripts": {
-  "start": "node ./bin/www",
-  "build": "react-scripts build", 
-  "deploy": "gh-pages -d build && npm start"
-},
+  "scripts": {
+    "start": "node ./bin/www",
+    "build": "react-scripts build",
+    "deploy": "gh-pages -d build"
+  },
   "dependencies": {
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
