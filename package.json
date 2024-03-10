@@ -1,12 +1,9 @@
 {
   "name": "pinterest",
-  "homepage": "https://shubham12-prof.github.io/pinterest",
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www",
-    "build": "react-scripts build",
-    "deploy": "gh-pages -d build"
+    "start": "node ./bin/www"
   },
   "dependencies": {
     "cookie-parser": "~1.4.4",
@@ -14,7 +11,6 @@
     "ejs": "~2.6.1",
     "express": "~4.16.1",
     "express-session": "^1.18.0",
-    "gh-pages": "^6.1.1",
     "http-errors": "~1.6.3",
     "mongoose": "^8.2.0",
     "morgan": "~1.9.1",
@@ -22,7 +18,6 @@
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "passport-local-mongoose": "^8.0.0",
-    "react-scripts": "^5.0.1",
     "uuid": "^9.0.1"
   }
 }
