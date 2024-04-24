@@ -1,74 +1,162 @@
-var express = require('express');
+var express = require("express");
 var router = express.Router();
 
-const userModel = require('./users');
-const postModel =require("./post")
-const passport = require('passport');
-const localStrategy = require("passport-local")
-const upload = require('./multer')
+const userModel = require("./users");
+const postModel = require("./post");
+const passport = require("passport");
+const localStrategy = require("passport-local");
+const upload = require("./multer");
+const admin = require("firebase-admin");
 
-passport.use(new localStrategy(userModel.authenticate()))
+var serviceAccount = require("./config/serviceAccountkey.json");
 
-router.get('/', function(req, res, next) {
-  res.render('index',{nav: false});
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://pinterest-authentication-default-rtdb.firebaseio.com",
 });
 
-router.get('/register', function(req, res, next) {
-  res.render('register', {nav : false});
+const db = admin.database();
+
+passport.use(new localStrategy(userModel.authenticate()));
+
+router.get("/", function (req, res, next) {
+  res.render("index", { nav: false });
 });
 
-router.get('/profile',isLoggedIn,async function(req, res, next) {
-  const user = 
-  await userModel
-  .findOne({username: req.session.passport.user})
-  .populate("posts")
-  console.log(user)
-  res.render('profile',{user, nav: true});
+router.get("/register", function (req, res, next) {
+  res.render("register", { nav: false });
 });
 
-router.get('/feed',isLoggedIn, async function(req, res, next) {
-  const user =  await userModel.findOne({username: req.session.passport.user})
-  const posts = await postModel.find()
-  .populate('user')
-  res.render('feed',{user,posts,nav:true})
+router.get("/profile", isLoggedIn, async function (req, res, next) {
+  const user = await userModel
+    .findOne({ username: req.session.passport.user })
+    .populate("posts");
+  // console.log(user);
+  res.render("profile", { user, nav: true });
 });
 
-router.get('/show/posts',isLoggedIn,async function(req, res, next) {
-  const user = 
-  await userModel
-  .findOne({username: req.session.passport.user})
-  .populate("posts")
-  console.log(user)
-  res.render('show',{user, nav: true});
+router.get("/feed", isLoggedIn, async function (req, res, next) {
+  const user = await userModel.findOne({ username: req.session.passport.user });
+  const posts = await postModel.find().populate("user");
+
+  const firebaseRef = db.ref("posts");
+  const firebaseData = await firebaseRef.once("value");
+  const firebasePosts = firebaseData.val();
+  console.log("Firebase Posts:", firebasePosts);
+
+  res.render("feed", { user, posts, firebasePosts, nav: true });
 });
 
-router.get('/add',isLoggedIn,async function(req, res, next) {
-  const user = await userModel.findOne({username: req.session.passport.user})
-  res.render('add',{user, nav: true});
+router.get("/show/posts", isLoggedIn, async function (req, res, next) {
+  const user = await userModel
+    .findOne({ username: req.session.passport.user })
+    .populate("posts");
+  // console.log(user);
+  res.render("show", { user, nav: true });
 });
 
-router.post('/createpost',isLoggedIn,upload.single("postimage"), async function(req, res, next) {
-  const user = await userModel.findOne({username: req.session.passport.user})
-  const post = await postModel.create({
-    user: user._id,
-    title:req.body.title,
-    description: req.body.description,
-    image: req.file.filename
- })
- user.posts.push(post._id);
- await user.save()
- res.redirect('/profile')
-// res.render('add', {user, nav: true})
+router.get("/add", isLoggedIn, async function (req, res, next) {
+  const user = await userModel.findOne({ username: req.session.passport.user });
+  res.render("add", { user, nav: true });
 });
 
-router.post('/fileupload',isLoggedIn,upload.single("image"),async function(req, res, next) {
-  const user = await userModel.findOne({username: req.session.passport.user})
-  user.profileImage= req.file.filename;
-  await user.save();
-  res.redirect('/profile')
-});
 
-router.post('/register', function(req, res, next) {
+router.post(
+  "/createpost",
+  isLoggedIn,
+  upload.single("postimage"),
+  async function (req, res, next) {
+    const user = await userModel.findOne({
+      username: req.session.passport.user,
+    });
+
+    const post = await postModel.create({
+      user: user._id,
+      title: req.body.title,
+      description: req.body.description,
+      image: req.file.filename,
+    });
+
+    user.posts.push(post._id);
+    await user.save();
+
+    const firebaseUserRef = db.ref(`users/${user.username}`);
+    firebaseUserRef.transaction((currentData) => {
+      if (currentData) {
+        if (!currentData.posts) {
+          currentData.posts = [];
+        }
+
+        currentData.posts.push({
+          postId: post._id,
+          title: req.body.title,
+          description: req.body.description,
+          image: req.file.filename,
+        });
+
+        if (!currentData.postCount) {
+          currentData.postCount = [post._id];
+        } else {
+          currentData.postCount.push(post._id);
+        }
+      }
+      return currentData;
+    });
+
+    const firebaseRef = db.ref("posts");
+    firebaseRef.push({
+      title: req.body.title,
+      description: req.body.description,
+      image: req.file.filename,
+      user: user.username,
+    });
+
+    console.log("Data to be pushed to Firebase:", {
+      title: req.body.title,
+      description: req.body.description,
+      image: req.file.filename,
+      user: user.username,
+    });
+
+    res.redirect("/profile");
+  }
+);
+
+router.post(
+  "/fileupload",
+  isLoggedIn,
+  upload.single("image"),
+  async function (req, res, next) {
+    const user = await userModel.findOne({
+      username: req.session.passport.user,
+    });
+
+    const storageRef = admin.storage().ref();
+    const imageRef = storageRef.child(
+      `profile_images/${user.username}/${req.file.filename}`
+    );
+    await imageRef.put(req.file.buffer);
+
+    const downloadURL = await imageRef.getDownloadURL();
+
+    const firebaseRef = db.ref(`users/${user.username}`);
+    firebaseRef.set({
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      contact: user.contact,
+      profileImage: req.file.filename,
+      firebaseProfileImage: downloadURL, 
+    });
+
+    user.profileImage = req.file.filename;
+    user.save();
+
+    res.redirect("/profile");
+  }
+);
+
+router.post("/register", function (req, res, next) {
   const data = new userModel({
     username: req.body.username,
     email: req.body.email,
@@ -76,28 +164,37 @@ router.post('/register', function(req, res, next) {
     name: req.body.fullname,
   });
 
-  userModel.register(data, req.body.password, function(err, user) {
+  userModel.register(data, req.body.password, async function (err, user) {
     if (err) {
       console.error(err);
       return res.redirect("/register");
     }
 
-    passport.authenticate("local")(req, res, function() {
+    const firebaseUserRef = db.ref(`users/${user.username}`);
+    firebaseUserRef.set({
+      username: user.username,
+      email: user.email,
+      contact: user.contact,
+      name: user.name,
+    });
+
+    passport.authenticate("local")(req, res, function () {
       console.log("Authentication successful");
-      res.redirect("/profile"); // Redirect to the profile page after successful registration
+      res.redirect("/profile"); 
     });
   });
 });
 
+router.post(
+  "/login",
+  passport.authenticate("local", {
+    successRedirect: "/profile",
+    failureRedirect: "/",
+  }),
+  function (req, res, next) {}
+);
 
-router.post('/login',passport.authenticate("local",{
-successRedirect:"/profile",
-failureRedirect:"/",
-}),function(req,res,next){
-
-})
-
-router.get("/logout", function (req, res,next) {
+router.get("/logout", function (req, res, next) {
   req.logOut(function (err) {
     if (err) {
       return next(err);
