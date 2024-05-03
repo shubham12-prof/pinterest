@@ -6,15 +6,12 @@ var cookieParser = require("cookie-parser");
 var logger = require("morgan");
 const expressSession = require("express-session");
 const passport = require("passport");
-// const mongoose =require('mongoose')
 
 var indexRouter = require("./routes/index");
 var usersRouter = require("./routes/users");
 
 
 var app = express();
-// dotenv.config({path:'./config.env'})
-// const DB = process.env.DATABASE;
 
 
 app.set("views", path.join(__dirname, "views"));
