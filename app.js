@@ -1,4 +1,5 @@
-const dotenv = require('dotenv')
+const dotenv = require('dotenv');
+dotenv.config();
 var createError = require("http-errors");
 var express = require("express");
 var path = require("path");
@@ -10,9 +11,7 @@ const passport = require("passport");
 var indexRouter = require("./routes/index");
 var usersRouter = require("./routes/users");
 
-
 var app = express();
-
 
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
@@ -21,7 +20,7 @@ app.use(
   expressSession({
     resave: false,
     saveUninitialized: false,
-    secret: "hey shubham",
+    secret: process.env.SECRET_KEY || "default_secret_key",
   })
 );
 
@@ -43,16 +42,16 @@ app.use(function (req, res, next) {
   next(createError(404));
 });
 
-
 app.use(function (err, req, res, next) {
-
   res.locals.message = err.message;
   res.locals.error = req.app.get("env") === "development" ? err : {};
-
   res.status(err.status || 500);
   res.render("error");
 });
 
-
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 
 module.exports = app;

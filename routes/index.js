@@ -19,54 +19,71 @@ const db = admin.database();
 
 passport.use(new localStrategy(userModel.authenticate()));
 
-router.get("/", function (req, res, next) {
+// Middleware to check if user is logged in
+function isLoggedIn(req, res, next) {
+  if (req.isAuthenticated()) return next();
+  res.redirect("/");
+}
+
+// Routes
+router.get("/", (req, res, next) => {
   res.render("index", { nav: false });
 });
 
-router.get("/register", function (req, res, next) {
+router.get("/register", (req, res, next) => {
   res.render("register", { nav: false });
 });
 
-router.get("/profile", isLoggedIn, async function (req, res, next) {
-  const user = await userModel
-    .findOne({ username: req.session.passport.user })
-    .populate("posts");
-  res.render("profile", { user, nav: true });
+router.get("/profile", isLoggedIn, async (req, res, next) => {
+  try {
+    const user = await userModel
+      .findOne({ username: req.session.passport.user })
+      .populate("posts");
+    res.render("profile", { user, nav: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get("/feed", isLoggedIn, async function (req, res, next) {
-  const user = await userModel.findOne({ username: req.session.passport.user });
-  const posts = await postModel.find().populate("user");
+router.get("/feed", isLoggedIn, async (req, res, next) => {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
+    const posts = await postModel.find().populate("user");
 
-  const firebaseRef = db.ref("posts");
-  const firebaseData = await firebaseRef.once("value");
-  const firebasePosts = firebaseData.val();
-  console.log("Firebase Posts:", firebasePosts);
+    const firebaseRef = db.ref("posts");
+    const firebaseData = await firebaseRef.once("value");
+    const firebasePosts = firebaseData.val();
+    console.log("Firebase Posts:", firebasePosts);
 
-  res.render("feed", { user, posts, firebasePosts, nav: true });
+    res.render("feed", { user, posts, firebasePosts, nav: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get("/show/posts", isLoggedIn, async function (req, res, next) {
-  const user = await userModel
-    .findOne({ username: req.session.passport.user })
-    .populate("posts");
-  res.render("show", { user, nav: true });
+router.get("/show/posts", isLoggedIn, async (req, res, next) => {
+  try {
+    const user = await userModel
+      .findOne({ username: req.session.passport.user })
+      .populate("posts");
+    res.render("show", { user, nav: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get("/add", isLoggedIn, async function (req, res, next) {
-  const user = await userModel.findOne({ username: req.session.passport.user });
-  res.render("add", { user, nav: true });
+router.get("/add", isLoggedIn, async (req, res, next) => {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
+    res.render("add", { user, nav: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
-
-router.post(
-  "/createpost",
-  isLoggedIn,
-  upload.single("postimage"),
-  async function (req, res, next) {
-    const user = await userModel.findOne({
-      username: req.session.passport.user,
-    });
+router.post("/createpost", isLoggedIn, upload.single("postimage"), async (req, res, next) => {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
 
     const post = await postModel.create({
       user: user._id,
@@ -79,57 +96,58 @@ router.post(
     await user.save();
 
     res.redirect("/profile");
+  } catch (err) {
+    next(err);
   }
-);
+});
 
-router.post(
-  "/fileupload",
-  isLoggedIn,
-  upload.single("image"),
-  async function (req, res, next) {
-    const user = await userModel.findOne({
-      username: req.session.passport.user,
-    });
+router.post("/fileupload", isLoggedIn, upload.single("image"), async (req, res, next) => {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
 
     const storageRef = admin.storage().ref();
-    const imageRef = storageRef.child(
-      `profile_images/${user.username}/${req.file.filename}`
-    );
+    const imageRef = storageRef.child(`profile_images/${user.username}/${req.file.filename}`);
     await imageRef.put(req.file.buffer);
     user.profileImage = req.file.filename;
-    user.save();
+    await user.save();
 
     res.redirect("/profile");
+  } catch (err) {
+    next(err);
   }
-);
+});
 
-router.post("/register", function (req, res, next) {
-  const data = new userModel({
-    username: req.body.username,
-    email: req.body.email,
-    contact: req.body.contact,
-    name: req.body.fullname,
-  });
-
-  userModel.register(data, req.body.password, async function (err, user) {
-    if (err) {
-      console.error(err);
-      return res.redirect("/register");
-    }
-
-    const firebaseUserRef = db.ref(`users/${user.username}`);
-    firebaseUserRef.set({
-      username: user.username,
-      email: user.email,
-      contact: user.contact,
-      name: user.name,
+router.post("/register", async (req, res, next) => {
+  try {
+    const data = new userModel({
+      username: req.body.username,
+      email: req.body.email,
+      contact: req.body.contact,
+      name: req.body.fullname,
     });
 
-    passport.authenticate("local")(req, res, function () {
-      console.log("Authentication successful");
-      res.redirect("/profile"); 
+    userModel.register(data, req.body.password, async (err, user) => {
+      if (err) {
+        console.error(err);
+        return res.redirect("/register");
+      }
+
+      const firebaseUserRef = db.ref(`users/${user.username}`);
+      firebaseUserRef.set({
+        username: user.username,
+        email: user.email,
+        contact: user.contact,
+        name: user.name,
+      });
+
+      passport.authenticate("local")(req, res, () => {
+        console.log("Authentication successful");
+        res.redirect("/profile");
+      });
     });
-  });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post(
@@ -137,22 +155,16 @@ router.post(
   passport.authenticate("local", {
     successRedirect: "/profile",
     failureRedirect: "/",
-  }),
-  function (req, res, next) {}
+  })
 );
 
-router.get("/logout", function (req, res, next) {
-  req.logOut(function (err) {
+router.get("/logout", (req, res, next) => {
+  req.logOut((err) => {
     if (err) {
       return next(err);
     }
     res.redirect("/");
   });
 });
-
-function isLoggedIn(req, res, next) {
-  if (req.isAuthenticated()) return next();
-  res.redirect("/");
-}
 
 module.exports = router;
