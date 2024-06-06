@@ -31,7 +31,6 @@ router.get("/profile", isLoggedIn, async function (req, res, next) {
   const user = await userModel
     .findOne({ username: req.session.passport.user })
     .populate("posts");
-  // console.log(user);
   res.render("profile", { user, nav: true });
 });
 
@@ -79,44 +78,6 @@ router.post(
     user.posts.push(post._id);
     await user.save();
 
-    const firebaseUserRef = db.ref(`users/${user.username}`);
-    firebaseUserRef.transaction((currentData) => {
-      if (currentData) {
-        if (!currentData.posts) {
-          currentData.posts = [];
-        }
-
-        currentData.posts.push({
-          postId: post._id,
-          title: req.body.title,
-          description: req.body.description,
-          image: req.file.filename,
-        });
-
-        if (!currentData.postCount) {
-          currentData.postCount = [post._id];
-        } else {
-          currentData.postCount.push(post._id);
-        }
-      }
-      return currentData;
-    });
-
-    const firebaseRef = db.ref("posts");
-    firebaseRef.push({
-      title: req.body.title,
-      description: req.body.description,
-      image: req.file.filename,
-      user: user.username,
-    });
-
-    console.log("Data to be pushed to Firebase:", {
-      title: req.body.title,
-      description: req.body.description,
-      image: req.file.filename,
-      user: user.username,
-    });
-
     res.redirect("/profile");
   }
 );
@@ -135,19 +96,6 @@ router.post(
       `profile_images/${user.username}/${req.file.filename}`
     );
     await imageRef.put(req.file.buffer);
-
-    const downloadURL = await imageRef.getDownloadURL();
-
-    const firebaseRef = db.ref(`users/${user.username}`);
-    firebaseRef.set({
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      contact: user.contact,
-      profileImage: req.file.filename,
-      firebaseProfileImage: downloadURL, 
-    });
-
     user.profileImage = req.file.filename;
     user.save();
 
