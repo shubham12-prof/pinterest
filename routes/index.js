@@ -30,19 +30,14 @@ router.get("/", (req, res, next) => {
   res.render("index", { nav: false });
 });
 
-router.get("/register", (req, res, next) => {
+router.get("/register", function (req, res, next) {
   res.render("register", { nav: false });
 });
-
-router.get("/profile", isLoggedIn, async (req, res, next) => {
-  try {
-    const user = await userModel
-      .findOne({ username: req.session.passport.user })
-      .populate("posts");
-    res.render("profile", { user, nav: true });
-  } catch (err) {
-    next(err);
-  }
+router.get("/profile", isLoggedIn, async function (req, res, next) {
+  const user = await userModel
+    .findOne({ username: req.session.passport.user })
+    .populate("posts");
+  res.render("profile", { user, nav: true });
 });
 
 router.get("/feed", isLoggedIn, async (req, res, next) => {
