@@ -1,6 +1,6 @@
 const dotenv = require('dotenv');
 dotenv.config();
-console.log("MONGODB_URI:", process.env.MONGODB_URI); // Check if the variable is loaded
+console.log("MONGODB_URI:", process.env.MONGODB_URI); 
 const createError = require('http-errors');
 const express = require('express');
 const path = require('path');
@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const expressSession = require('express-session');
 const passport = require('passport');
-const { mongooseConnect } = require('./config'); // Adjust the path if necessary
+const { mongooseConnect } = require('./config');
 
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
@@ -18,11 +18,11 @@ const app = express();
 mongooseConnect().then(() => {
     console.log("Mongoose connected and server starting");
 
-    // Set view engine
+  
     app.set('views', path.join(__dirname, 'views'));
     app.set('view engine', 'ejs');
 
-    // Session configuration
+    
     app.use(expressSession({
         resave: false,
         saveUninitialized: false,
@@ -34,18 +34,18 @@ mongooseConnect().then(() => {
     passport.serializeUser(usersRouter.serializeUser());
     passport.deserializeUser(usersRouter.deserializeUser());
 
-    // Middleware
+
     app.use(logger('dev'));
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, 'public')));
 
-    // Routes
+   
     app.use('/', indexRouter);
     app.use('/users', usersRouter);
 
-    // Error handling
+  
     app.use((req, res, next) => {
         next(createError(404));
     });
@@ -57,7 +57,7 @@ mongooseConnect().then(() => {
         res.render('error');
     });
 
-    // Start server
+    
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
