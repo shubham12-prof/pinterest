@@ -6,26 +6,14 @@ const postModel = require("./post");
 const passport = require("passport");
 const localStrategy = require("passport-local");
 const upload = require("./multer");
-const admin = require("firebase-admin");
-
-var serviceAccount = require("./config/serviceAccountkey.json");
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://pinterest-authentication-default-rtdb.firebaseio.com",
-});
-
-const db = admin.database();
 
 passport.use(new localStrategy(userModel.authenticate()));
 
-// Middleware to check if user is logged in
 function isLoggedIn(req, res, next) {
   if (req.isAuthenticated()) return next();
   res.redirect("/");
 }
 
-// Routes
 router.get("/", (req, res, next) => {
   res.render("index", { nav: false });
 });
@@ -45,12 +33,7 @@ router.get("/feed", isLoggedIn, async (req, res, next) => {
     const user = await userModel.findOne({ username: req.session.passport.user });
     const posts = await postModel.find().populate("user");
 
-    const firebaseRef = db.ref("posts");
-    const firebaseData = await firebaseRef.once("value");
-    const firebasePosts = firebaseData.val();
-    console.log("Firebase Posts:", firebasePosts);
-
-    res.render("feed", { user, posts, firebasePosts, nav: true });
+    res.render("feed", { user, posts, nav: true });
   } catch (err) {
     next(err);
   }
@@ -100,11 +83,7 @@ router.post("/fileupload", isLoggedIn, upload.single("image"), async (req, res, 
   try {
     const user = await userModel.findOne({ username: req.session.passport.user });
 
-    const storageRef = admin.storage().ref();
-    const imageRef = storageRef.child(`profile_images/${user.username}/${req.file.filename}`);
-    await imageRef.put(req.file.buffer);
-    user.profileImage = req.file.filename;
-    await user.save();
+    // Code related to Firebase removed
 
     res.redirect("/profile");
   } catch (err) {
@@ -126,14 +105,6 @@ router.post("/register", async (req, res, next) => {
         console.error(err);
         return res.redirect("/register");
       }
-
-      const firebaseUserRef = db.ref(`users/${user.username}`);
-      firebaseUserRef.set({
-        username: user.username,
-        email: user.email,
-        contact: user.contact,
-        name: user.name,
-      });
 
       passport.authenticate("local")(req, res, () => {
         console.log("Authentication successful");
