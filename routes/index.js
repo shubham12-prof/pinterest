@@ -1,38 +1,44 @@
-var express = require("express");
-var router = express.Router();
+const express = require("express");
+const router = express.Router();
 
 const userModel = require("./users");
 const postModel = require("./post");
 const passport = require("passport");
 const localStrategy = require("passport-local");
 const upload = require("./multer");
+const path = require('path');
 
+// Initialize Passport
 passport.use(new localStrategy(userModel.authenticate()));
 
+// Middleware to check if user is authenticated
 function isLoggedIn(req, res, next) {
   if (req.isAuthenticated()) return next();
   res.redirect("/");
 }
 
-router.get("/", (req, res, next) => {
+// Routes
+router.get("/", (req, res) => {
   res.render("index", { nav: false });
 });
 
-router.get("/register", function (req, res, next) {
+router.get("/register", (req, res) => {
   res.render("register", { nav: false });
 });
-router.get("/profile", isLoggedIn, async function (req, res, next) {
-  const user = await userModel
-    .findOne({ username: req.session.passport.user })
-    .populate("posts");
-  res.render("profile", { user, nav: true });
+
+router.get("/profile", isLoggedIn, async (req, res, next) => {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user }).populate("posts");
+    res.render("profile", { user, nav: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get("/feed", isLoggedIn, async (req, res, next) => {
   try {
     const user = await userModel.findOne({ username: req.session.passport.user });
     const posts = await postModel.find().populate("user");
-
     res.render("feed", { user, posts, nav: true });
   } catch (err) {
     next(err);
@@ -41,9 +47,7 @@ router.get("/feed", isLoggedIn, async (req, res, next) => {
 
 router.get("/show/posts", isLoggedIn, async (req, res, next) => {
   try {
-    const user = await userModel
-      .findOne({ username: req.session.passport.user })
-      .populate("posts");
+    const user = await userModel.findOne({ username: req.session.passport.user }).populate("posts");
     res.render("show", { user, nav: true });
   } catch (err) {
     next(err);
@@ -83,8 +87,6 @@ router.post("/fileupload", isLoggedIn, upload.single("image"), async (req, res, 
   try {
     const user = await userModel.findOne({ username: req.session.passport.user });
 
-    // Code related to Firebase removed
-
     res.redirect("/profile");
   } catch (err) {
     next(err);
@@ -100,7 +102,7 @@ router.post("/register", async (req, res, next) => {
       name: req.body.fullname,
     });
 
-    userModel.register(data, req.body.password, async (err, user) => {
+    userModel.register(data, req.body.password, (err, user) => {
       if (err) {
         console.error(err);
         return res.redirect("/register");
@@ -131,6 +133,11 @@ router.get("/logout", (req, res, next) => {
     }
     res.redirect("/");
   });
+});
+
+// Serve favicon
+router.get('/favicon.ico', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
 });
 
 module.exports = router;
